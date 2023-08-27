@@ -1,0 +1,71 @@
+version: "3.8"
+
+x-common-env: &common-env
+  restart: always
+  environment:
+    - PUID=${PUID}
+    - PGID=${PGID}
+    - TZ=${TZ}
+    - PLEX_CLAIM=${PLEX_CLAIM}
+    # - UMASK=${UMASK}
+    - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
+    - VERSION=docker
+volumes:
+  portainer_data:
+
+services:
+  portainer:
+    image: portainer/portainer
+    ports:
+      - 9000:9000
+      - 8000:8000
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+        
+  qbittorrent:
+    image:  linuxserver/qbittorrent:arm32v7-4.4.3.1-r1-ls208
+    <<: *common-env
+    network_mode: "host"
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8080:8080
+    volumes:
+      - ${CONFIGS}/qbittorrent/:/config
+      - ${DOWNLOADS}:/downloads
+
+  # Feeds with torrents to radarr and sonarr
+  jackett:
+    image: linuxserver/jackett:arm32v7-version-v0.21.352
+    network_mode: "host"
+    <<: *common-env
+    volumes:
+      - ${CONFIGS}/jackett:/config
+      - ${DOWNLOADS}/blackhole:/downloads
+    ports:
+      - 9117:9117
+
+  # for automaticly having movies
+  radarr:
+    image: hotio/radarr:nightly-18289be-1747-linux-arm-v7
+    network_mode: "host"     
+    <<: *common-env
+    volumes:
+      - ${CONFIGS}/radarr:/config
+      - ${MOVIES}:/movies
+      - ${DOWNLOADS}:/downloads
+    ports:
+      - 7878:7878
+
+  sonarr:
+    image: linuxserver/sonarr:arm32v7-develop-version-3.0.9.1555
+    network_mode: "host"
+    <<: *common-env
+    volumes:
+      - ${CONFIGS}/sonarr:/config
+      # - ./configs/sonarr/:/Applications\Programs\Data\Sonar
+      - ${DOWNLOADS}:/downloads
+      - ${TV}:/tv
+    ports:
+      - 8989:8989

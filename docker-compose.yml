@@ -1,0 +1,186 @@
+version: "3.8"
+
+x-common-env: &common-env
+  restart: always
+  environment:
+    - PUID=${PUID}
+    - PGID=${PGID}
+    - TZ=${TZ}
+    - PLEX_CLAIM=${PLEX_CLAIM}
+    # - UMASK=${UMASK}
+    - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
+    - NVIDIA_VISIBLE_DEVICES=all
+    - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    - VERSION=docker
+
+services:
+  plex:
+    image: plexinc/pms-docker
+    privileged: true
+    # networks:
+    #   - mynetwork
+    network_mode: host
+    <<: *common-env
+    # ports:
+    #   - 32400:32400
+    #   - 8324:8324
+    #   - 32469:32469
+    #   - 1900:1900/udp
+    #   - 32410:32410/udp
+    #   - 32412:32412/udp
+    #   - 32413:32413/udp
+    #   - 32414:32414/udp
+    volumes:
+      - ${CONFIGS}/plex:/config
+      - ${CONFIGS}/plex/db:${PLEXDB}
+      - ${CONFIGS}/plex/plugins:${PLEXPLUGINS}
+      - ${CONFIGS}/plex/transcode:/transcode
+      - ${DOWNLOADS}:/downloads
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/dri/card0:/dev/dri/card0
+      - /dev/dri:/dev/dri
+    cpu_percent: 50
+    mem_limit: 1500M
+    mem_reservation: 1300M
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+  qbittorrent:
+    image: ghcr.io/linuxserver/qbittorrent:unstable-version-4.4.0202106140855-7320-2bd5aca3aubuntu20.04.1
+    <<: *common-env
+    # networks:
+    #   - mynetwork
+    depends_on:
+      - vpn
+      # vpn:
+        # condition: service_healthy
+    network_mode: "service:vpn"
+    # ports:
+    #   - 6881:6881
+    #   - 6881:6881/udp
+    #   - 8080:8080
+    volumes:
+      - ${CONFIGS}/qbittorrent/:/config
+      - ${DOWNLOADS}:/downloads
+
+  # Feeds with torrents to radarr and sonarr
+  jackett:
+    image: linuxserver/jackett
+    # networks:
+    #   - mynetwork
+    <<: *common-env
+    network_mode: "service:vpn"
+    volumes:
+      - ${CONFIGS}/jackett:/config
+      - ${DOWNLOADS}/blackhole:/downloads
+    # ports:
+    #   - 9117:9117
+    depends_on:
+      - vpn
+      # vpn:
+      #   condition: service_healthy
+    restart: unless-stopped
+
+  # for automaticly having movies
+  radarr:
+    image: linuxserver/radarr:latest
+    <<: *common-env
+    networks:
+      - mynetwork
+    volumes:
+      - ${CONFIGS}/radarr:/config
+      - ${DOWNLOADS}:/downloads
+    links:
+      - qbittorrent
+      - jackett
+    ports:
+      - 7878:7878
+
+  sonarr:
+    image: linuxserver/sonarr
+    networks:
+      - mynetwork
+    <<: *common-env
+    volumes:
+      - ${CONFIGS}/sonarr:/config
+      # - ./configs/sonarr/:/Applications\Programs\Data\Sonar
+      - ${DOWNLOADS}:/downloads
+      - ${TV}:/tv
+    ports:
+      - 8989:8989
+    links:
+      - jackett
+      - qbittorrent
+
+  # Bazarr is a companion application to Sonarr and Radarr.
+  # It can manage and download subtitles based on your requirements.
+  # You define your preferences by TV show or movie and Bazarr takes care of everything for you.
+  bazarr:
+    image: linuxserver/bazarr
+    networks:
+      - mynetwork
+    <<: *common-env
+    volumes:
+      - ${DOWNLOADS}:/downloads
+      - ${CONFIGS}/bazarr:/config
+    ports:
+      - 6767:6767
+    links:
+      - sonarr
+      - radarr
+
+  xteve:
+    image: taylorbourne/xteve_lazystream
+    restart: unless-stopped
+    ports:
+      - "34400:34400"
+    networks:
+      - mynetwork
+    <<: *common-env
+    volumes:
+      - ${CONFIGS}/xteve/.xteve:/xteve
+      - ${CONFIGS}/xteve/config/:/config
+      - ${CONFIGS}/xteve/guide2go/:/guide2go
+      - ${CONFIGS}/xteve/playlists/:/playlists
+      - /tmp/xteve/:/tmp/xteve
+
+  vpn:
+    devices:
+      - /dev/net/tun
+    restart: unless-stopped
+    container_name: vpn
+    privileged: true
+    # networks:
+    #   - mynetwork
+    ports:
+      # jackett ports
+      - 9117:9117
+      # qbittorrent
+      - 6881:6881
+      #- 6881:6881/udp
+      - 8080:8080
+    dns:
+      - 1.1.1.1
+    image: dperson/openvpn-client
+    security_opt:
+      - label:disable
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    volumes:
+      - ${CONFIGS}/openvpn:/vpn
+    command: -f ""
+
+
+networks:
+    mynetwork:
+      driver: bridge
+      ipam:
+        # driver: default
+        config:
+        - subnet: 192.168.112.0/24
