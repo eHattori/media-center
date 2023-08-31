@@ -52,17 +52,17 @@ services:
   qbittorrent:
     image: ghcr.io/linuxserver/qbittorrent:unstable-version-4.4.0202106140855-7320-2bd5aca3aubuntu20.04.1
     <<: *common-env
-    # networks:
-    #   - mynetwork
-    depends_on:
-      - vpn
+    networks:
+      - mynetwork
+    # depends_on:
+    #   - vpn
       # vpn:
         # condition: service_healthy
-    network_mode: "service:vpn"
-    # ports:
-    #   - 6881:6881
-    #   - 6881:6881/udp
-    #   - 8080:8080
+    # network_mode: "service:vpn"
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8080:8080
     volumes:
       - ${CONFIGS}/qbittorrent/:/config
       - ${DOWNLOADS}:/downloads
@@ -70,17 +70,17 @@ services:
   # Feeds with torrents to radarr and sonarr
   jackett:
     image: linuxserver/jackett
-    # networks:
-    #   - mynetwork
+    networks:
+      - mynetwork
     <<: *common-env
-    network_mode: "service:vpn"
+    # network_mode: "service:vpn"
     volumes:
       - ${CONFIGS}/jackett:/config
       - ${DOWNLOADS}/blackhole:/downloads
-    # ports:
-    #   - 9117:9117
-    depends_on:
-      - vpn
+    ports:
+      - 9117:9117
+    # depends_on:
+    #   - vpn
       # vpn:
       #   condition: service_healthy
     restart: unless-stopped
@@ -148,33 +148,46 @@ services:
       - ${CONFIGS}/xteve/playlists/:/playlists
       - /tmp/xteve/:/tmp/xteve
 
-  vpn:
-    devices:
-      - /dev/net/tun
-    restart: unless-stopped
-    container_name: vpn
-    privileged: true
-    # networks:
-    #   - mynetwork
+  overseerr:
+    image: sctx/overseerr:latest
+    container_name: overseerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=Asia/Tokyo
+      - PORT=5055 #optional
     ports:
-      # jackett ports
-      - 9117:9117
-      # qbittorrent
-      - 6881:6881
-      #- 6881:6881/udp
-      - 8080:8080
-    dns:
-      - 1.1.1.1
-    image: dperson/openvpn-client
-    security_opt:
-      - label:disable
-    cap_add:
-      - NET_ADMIN
-    stdin_open: true
-    tty: true
+      - 5055:5055
     volumes:
-      - ${CONFIGS}/openvpn:/vpn
-    command: -f ""
+      - ${CONFIGS}/overserr/config:/app/config
+    restart: unless-stopped        
+
+  #vpn:
+  #  devices:
+  #    - /dev/net/tun
+  #  restart: unless-stopped
+  #  container_name: vpn
+  #  privileged: true
+  #  networks:
+  #    - mynetwork
+  #  ports:
+  #    # jackett ports
+  #    - 9117:9117
+  #    # qbittorrent
+  #    - 6881:6881
+  #    #- 6881:6881/udp
+  #    - 8080:8080
+  #  dns:
+  #    - 1.1.1.1
+  #  image: dperson/openvpn-client
+  #  security_opt:
+  #    - label:disable
+  #  cap_add:
+  #    - NET_ADMIN
+  #  stdin_open: true
+  #  tty: true
+  #  volumes:
+  #    - ${CONFIGS}/openvpn:/vpn
+  #  command: -f ""
 
 
 networks:
