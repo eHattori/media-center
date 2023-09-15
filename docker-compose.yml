@@ -40,14 +40,15 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
       - /dev/dri/card0:/dev/dri/card0
       - /dev/dri:/dev/dri
-    cpu_percent: 50
-    mem_limit: 1500M
-    mem_reservation: 1300M
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
+      # - /dev/bus/usb:/dev/bus/usb
+    # cpu_percent: 50
+    mem_limit: 2000M
+    mem_reservation: 2000M
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
 
   qbittorrent:
     image: ghcr.io/linuxserver/qbittorrent:unstable-version-4.4.0202106140855-7320-2bd5aca3aubuntu20.04.1
