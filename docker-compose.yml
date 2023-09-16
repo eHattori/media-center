@@ -109,7 +109,6 @@ services:
   flaresolverr:
     # DockerHub mirror flaresolverr/flaresolverr:latest
     image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
     networks:
       - mynetwork
     environment:
@@ -207,7 +206,8 @@ services:
     restart: unless-stopped        
 
   zerotier:
-    image: zerotier/zerotier
+    image: henrist/zerotier-one
+    privileged: true
     devices:
       - /dev/net/tun
     network_mode: host
@@ -216,7 +216,7 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN     
-      - NET_RAW     
+      # - NET_RAW     
     restart: unless-stopped        
 
   #vpn:
