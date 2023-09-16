@@ -40,18 +40,20 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
       - /dev/dri/card0:/dev/dri/card0
       - /dev/dri:/dev/dri
-      # - /dev/bus/usb:/dev/bus/usb
+      - /dev/bus/usb:/dev/bus/usb
     # cpu_percent: 50
-    mem_limit: 2000M
-    mem_reservation: 2000M
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: [gpu]
+    # mem_limit: 2000M
+    # mem_reservation: 2000M
+    depends_on: 
+      - xteve
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
 
   qbittorrent:
-    image: ghcr.io/linuxserver/qbittorrent:unstable-version-4.4.0202106140855-7320-2bd5aca3aubuntu20.04.1
+    image: ghcr.io/linuxserver/qbittorrent
     <<: *common-env
     networks:
       - mynetwork
@@ -80,11 +82,22 @@ services:
       - ${DOWNLOADS}/blackhole:/downloads
     ports:
       - 9117:9117
-    # depends_on:
-    #   - vpn
+    depends_on:
+      - flaresolverr
       # vpn:
       #   condition: service_healthy
     restart: unless-stopped
+
+  portainer:
+    image: portainer/portainer
+    ports:
+      - 9000:9000
+      - 8000:8000
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
   flaresolverr:
     # DockerHub mirror flaresolverr/flaresolverr:latest
     image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -172,6 +185,30 @@ services:
       - 5055:5055
     volumes:
       - ${CONFIGS}/overserr/config:/app/config
+    restart: unless-stopped        
+
+  watchtower:
+    image: containrrr/watchtower
+    networks:
+      - mynetwork      
+    <<: *common-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    # command: --interval 30
+    restart: unless-stopped        
+
+  zerotier:
+    image: zerotier/zerotier
+    devices:
+      - /dev/net/tun
+    network_mode: host
+    volumes:
+      - '/var/lib/zerotier-one:/var/lib/zerotier-one'
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN     
+      - NET_RAW     
     restart: unless-stopped        
 
   #vpn:
