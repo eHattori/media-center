@@ -46,11 +46,11 @@ services:
     # mem_reservation: 2000M
     depends_on: 
       - xteve
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
 
   qbittorrent:
     image: ghcr.io/linuxserver/qbittorrent
