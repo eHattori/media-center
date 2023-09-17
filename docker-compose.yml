@@ -9,8 +9,8 @@ x-common-env: &common-env
     - PLEX_CLAIM=${PLEX_CLAIM}
     # - UMASK=${UMASK}
     - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
-    - NVIDIA_VISIBLE_DEVICES=all
-    - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    # - NVIDIA_VISIBLE_DEVICES=all
+    # - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
     - VERSION=docker
 
 services:
@@ -37,10 +37,11 @@ services:
       - ${CONFIGS}/plex/transcode:/transcode
       - ${DOWNLOADS}:/downloads
     devices:
-      - /dev/dri/renderD128:/dev/dri/renderD128
+      # - /dev/dri/renderD128:/dev/dri/renderD128
       - /dev/dri/card0:/dev/dri/card0
       - /dev/dri:/dev/dri
-      - /dev/bus/usb:/dev/bus/usb
+      - /dev/kfd:/dev/kfd
+      # - /dev/bus/usb:/dev/bus/usb
     # cpu_percent: 50
     # mem_limit: 2000M
     # mem_reservation: 2000M
