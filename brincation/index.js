@@ -1,14 +1,14 @@
 const fs = require('fs');
 
 const API_KEY = process.env.API_KEY;
+const ENV = process.env.ENVIROMENT;
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
-const PROMPT = 'Traduza os textos a seguir para o Português do Brasil, mantendo a estrutura original e evitando o uso de tags <i>. Utilize o padrão de tradução XSC 1 e retorne as traduções no formato especificado: ';
-const testText = ` <TR IDX:"1" TXT:"Forgive me!" TR><TR IDX:"2" TXT:"Ha! So that's all for you, executioner." TR><TR IDX:"3" TXT:"Y-You monster..." TR><TR IDX:"4" TXT:"<i>My tears scattered like bits of paper</i>" TR><TR IDX:"5" TXT:"<i>Scared of the unknowable tomorrow</i>" TR>`;
+const PROMPT = 'Traduza os textos a seguir para o Português do Brasil, mantendo a estrutura original . Utilize o padrão de tradução XSC 1 e retorne as traduções no formato especificado ';
+
 
 async function askToTranslateGPT(textToTranslate) {
-    const answer = `${PROMPT}${textToTranslate}`;
-    
+
     const requestOptions = {
         method: 'POST',
         headers: {
@@ -16,14 +16,24 @@ async function askToTranslateGPT(textToTranslate) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
-            "messages": [{ "role": "user", "content": answer }],
-            "temperature": 0.7
+            "model": 'gpt-4',
+            "messages": [
+                { "role": "system", "content": PROMPT },
+                { "role": "user", "content": textToTranslate.replace(/<\/?i>|<\/?b>|\n/g, '') }
+            ],
+            "temperature": 0,
+            "top_p": 1,
+            "frequency_penalty": 0,
+            "presence_penalty": 0
         })
     };
     console.log('Iniciando tradução ...');
     const data = await fetch(ENDPOINT, requestOptions);
     const response = await data.json();
+    if (ENV === 'test' || ENV === 'debug') {
+        console.log('Request enviada: ', requestOptions);
+        console.log('Request Recebida: ', JSON.stringify(response, null, 3));
+    }
     console.log('Tradução finalizada...');
 
     return response.choices[0].message.content;
@@ -61,7 +71,7 @@ async function translate(blocks) {
 
     let currentText = '';
     for (const block of blocks) {
-        if (count == 15) {
+        if (count == 30) {
             textsToTranslate.push(currentText);
             count = 1;
             currentText = '';
@@ -70,10 +80,11 @@ async function translate(blocks) {
         count++;
     }
     textsToTranslate.push(currentText);
-    console.log(`Se preparando para traduzir ... ${textsToTranslate.length}`);
+    console.log(`Se preparando para traduzir ... ${textsToTranslate.length} partes`);
     const responses = await Promise.all(textsToTranslate.map((el) => askToTranslateGPT(el)));
-    
+
     console.log('Gerando arquivos');
+
     for (const translatedText of responses) {
         updateDataArray(blocks, translatedText);
     }
@@ -82,8 +93,8 @@ async function translate(blocks) {
 
 function breakInBlocks(path) {
 
-    const content = fs.readFileSync(path, 'utf-8');
-    const blocks = content.split(/\n{2,}/).map(block => {
+    const content = fs.readFileSync(path, 'utf-8').replace(/﻿/g, '');
+    const blocks = content.replace(/\r\n|\r|\n/g, '\n').split(/\n{2,}/).map(block => {
         const lines = block.split('\n');
 
         return {
@@ -104,15 +115,9 @@ function generateSrt(data, inputPath) {
     for (const entry of data) {
         srtContent += `${entry.index}\n${entry.time}\n${entry.text}\n\n`;
     }
-    
-    let replaceBy = '.str';
-    if(inputPath.includes('.en.str')){
-        replaceBy = '.en.str';
-    } else if(inputPath.includes('.en.forced.str')){
-        replaceBy = '.en.forced.str';
-    }
 
-    const filepath = inputPath.replace(replaceBy, '.pt-BR.srt');
+    const filepath = inputPath.replace(/\.en(\.forced)?\.srt$/, '.pt-BR.srt');
+    console.log(filepath);
 
     fs.openSync(filepath, 'w');
     fs.writeFileSync(filepath, srtContent);
@@ -122,7 +127,29 @@ const args = process.argv.slice(2);
 
 const inputPath = args[0];
 const blocks = breakInBlocks(inputPath);
-translate(blocks).then((blocks) => {
-    generateSrt(blocks, inputPath);
-});
+console.log('Blocos encontrados: ', blocks.length);
+if (ENV === 'test') {
+    console.warn('Running in TEST mode!!!');
+    translate([
+        {
+            index: '1',
+            time: '00:01:11,196 --> 00:01:12,781',
+            text: 'I got <b>everything</b> you <i>asked</i> for.'
+        },
+        {
+            index: '2',
+            time: '00:03:21,034 --> 00:03:24,787',
+            text: "It's disconnected\nfrom the higher dimension"
+        },
+    ]).then((blocks) => {
+        generateSrt(blocks, inputPath);
+    });
+
+} else {
+    console.log('Running in PROD mode!!!');
+    translate(blocks).then((blocks) => {
+        generateSrt(blocks, inputPath);
+    });
+}
+
 
